@@ -1,7 +1,0 @@
-def draw_dead():
-s = pygame.Surface(SIZE, pygame.SRCALPHA)
-s.fill((255,255,255,240))
-screen.blit(s, (0,0))
-txt = font120.render('YOU DEAD',True,COLORS['black'])
-x,y = 450,400
-screen.blit(txt,(x,y))

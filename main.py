@@ -1,11 +1,12 @@
-from flask import Flask, render_template, url_for, request, flash, session, redirect, abort, g
+from flask import Flask, render_template, request, flash, redirect, abort, g, url_for
 import sqlite3
 import os
 from FDataBase import FDataBase
+from werkzeug.security import generate_password_hash, check_password_hash
 
 DATABASE = '/tmp/totoro.db'
 DEBUG = True
-SECRET_KEY = 'sdkjfnsdk?naksj&dn12,3x14671'
+SECRET_KEY = '04ea0d564de50c71ce4eda5d951ea6a3bd04068a'
 
 app = Flask(__name__)
 app.config.from_object(__name__)
@@ -33,6 +34,16 @@ def get_db():
         return g.link_db
 
 
+dbase = None
+
+
+@app.before_request
+def before_request():
+    global dbase
+    db = get_db()
+    dbase = FDataBase(db)
+
+
 @app.teardown_appcontext
 def close_db(error):
     if hasattr(g, 'link_db'):
@@ -41,16 +52,11 @@ def close_db(error):
 
 @app.route("/")
 def index():
-    db = get_db()
-    dbbase = FDataBase(db)
-    return render_template('index.html', menu=dbbase.getMenu(), posts=dbbase.getPostsAnonce())
+    return render_template('index.html', menu=dbase.getMenu(), posts=dbase.getPostsAnonce())
 
 
 @app.route("/add_post", methods=["POST", "GET"])
 def addPost():
-    db = get_db()
-    dbase = FDataBase(db)
-
     if request.method == "POST":
         if len(request.form['name']) > 4 and len(request.form['post']) > 10:
             res = dbase.addPost(request.form['name'], request.form['post'], request.form['url'])
@@ -66,8 +72,6 @@ def addPost():
 
 @app.route('/post/<alias>')
 def showPost(alias):
-    db = get_db()
-    dbase = FDataBase(db)
     title, post = dbase.getPost(alias)
     if not title:
         abort(404)
@@ -75,5 +79,29 @@ def showPost(alias):
     return render_template('post.html', menu=dbase.getMenu(), title=title, post=post)
 
 
+@app.route('/login')
+def login():
+    return render_template('login.html', menu=dbase.getMenu(), title='Авторизация')
+
+
+@app.route("/register", methods=["POST", "GET"])
+def register():
+    if request.method == "POST":
+        if len(request.form['name']) > 4 and len(request.form['email']) > 4 \
+                and len(request.form['psw']) > 4 and request.form['psw'] == request.form['psw2']:
+            hash = generate_password_hash(request.form['psw'])
+            res = dbase.addUser(request.form['name'], request.form['email'], hash)
+            if res:
+                flash("Вы успешно зарегистрированы", "success")
+                return redirect(url_for('login'))
+            else:
+                flash("Ошибка при добавлении в БД", "error")
+        else:
+            flash("Неверно заполнены поля", "error")
+
+    return render_template("register.html", menu=dbase.getMenu(), title="Регистрация")
+
+
 if __name__ == '__main__':
     app.run(debug=True)
+

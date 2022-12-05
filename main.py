@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, login_required, current_user, logout_user
 from UserLogin import UserLogin
 from forms import LoginForm, RegisterForm
+from admin.admin import admin
 
 DATABASE = '/tmp/totoro.db'
 DEBUG = True
@@ -14,8 +15,9 @@ MAX_CONTENT_LENGTH = 1024 * 1024
 
 app = Flask(__name__)
 app.config.from_object(__name__)
-
 app.config.update(dict(DATABASE=os.path.join(app.root_path, 'totoro.db')))
+
+app.register_blueprint(admin, url_prefix='/admin')
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -112,30 +114,18 @@ def login():
         flash('Неверная пара логин/пароль', 'error')
     return render_template('login.html', menu=dbase.getMenu(), title='Авторизация', form=form)
 
-    # if request.method == 'POST':
-    #     user = dbase.getUserByEmail(request.form['email'])
-    #     if user and check_password_hash(user['psw'], request.form['psw']):
-    #         userlogin = UserLogin().create(user)
-    #         rm = True if request.form.get('remainme') else False  # запоминание пользователя
-    #         login_user(userlogin, remember=rm)
-    #         return redirect(request.args.get('next') or url_for('profile'))
-    #
-    #     flash('Неверная пара логин/пароль', 'error')
-    #
-    # return render_template('login.html', menu=dbase.getMenu(), title='Авторизация')
-
 
 @app.route("/register", methods=["POST", "GET"])
 def register():
     form = RegisterForm()
     if form.validate_on_submit():
-            hash = generate_password_hash(form.psw.data)
-            res = dbase.addUser(form.name.data, form.email.data, hash)
-            if res:
-                flash("Вы успешно зарегистрированы", "success")
-                return redirect(url_for('login'))
-            else:
-                flash("Ошибка при добавлении в БД", "error")
+        hash = generate_password_hash(form.psw.data)
+        res = dbase.addUser(form.name.data, form.email.data, hash)
+        if res:
+            flash("Вы успешно зарегистрированы", "success")
+            return redirect(url_for('login'))
+        else:
+            flash("Ошибка при добавлении в БД", "error")
 
     return render_template("register.html", menu=dbase.getMenu(), title="Регистрация", form=form)
 

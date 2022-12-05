@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, login_required, current_user, logout_user
 from UserLogin import UserLogin
 from forms import LoginForm, RegisterForm
+from admin.admin import admin
 
 DATABASE = '/tmp/totoro.db'
 DEBUG = True
@@ -14,13 +15,14 @@ MAX_CONTENT_LENGTH = 1024 * 1024
 
 app = Flask(__name__)
 app.config.from_object(__name__)
-
 app.config.update(dict(DATABASE=os.path.join(app.root_path, 'totoro.db')))
+
+app.register_blueprint(admin, url_prefix='/admin')
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-login_manager.login_message = 'Пожалуйста авторизуйтесь для доступа к закрытым страницам'
-login_manager.login_message_category = 'success'
+login_manager.login_message = "Авторизуйтесь для доступа к закрытым страницам"
+login_manager.login_message_category = "success"
 
 
 @login_manager.user_loader
@@ -36,6 +38,7 @@ def connect_db():
 
 
 def create_db():
+    """Вспомогательная функция для создания таблиц БД"""
     db = connect_db()
     with app.open_resource('sq_db.sql', mode='r') as f:
         db.cursor().executescript(f.read())
@@ -44,9 +47,10 @@ def create_db():
 
 
 def get_db():
+    '''Соединение с БД, если оно еще не установлено'''
     if not hasattr(g, 'link_db'):
         g.link_db = connect_db()
-        return g.link_db
+    return g.link_db
 
 
 dbase = None
@@ -54,6 +58,7 @@ dbase = None
 
 @app.before_request
 def before_request():
+    """Установление соединения с БД перед выполнением запроса"""
     global dbase
     db = get_db()
     dbase = FDataBase(db)
@@ -61,6 +66,7 @@ def before_request():
 
 @app.teardown_appcontext
 def close_db(error):
+    '''Закрываем соединение с БД, если оно было установлено'''
     if hasattr(g, 'link_db'):
         g.link_db.close()
 
@@ -85,7 +91,7 @@ def addPost():
     return render_template('add_post.html', menu=dbase.getMenu(), title="Добавление статьи")
 
 
-@app.route('/post/<alias>')
+@app.route("/post/<alias>")
 @login_required
 def showPost(alias):
     title, post = dbase.getPost(alias)
@@ -95,7 +101,7 @@ def showPost(alias):
     return render_template('post.html', menu=dbase.getMenu(), title=title, post=post)
 
 
-@app.route('/login', methods=['POST', 'GET'])
+@app.route("/login", methods=["POST", "GET"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('profile'))
@@ -107,35 +113,24 @@ def login():
             userlogin = UserLogin().create(user)
             rm = form.remember.data
             login_user(userlogin, remember=rm)
-            return redirect(request.args.get('next') or url_for('profile'))
+            return redirect(request.args.get("next") or url_for("profile"))
 
-        flash('Неверная пара логин/пароль', 'error')
-    return render_template('login.html', menu=dbase.getMenu(), title='Авторизация', form=form)
+        flash("Неверная пара логин/пароль", "error")
 
-    # if request.method == 'POST':
-    #     user = dbase.getUserByEmail(request.form['email'])
-    #     if user and check_password_hash(user['psw'], request.form['psw']):
-    #         userlogin = UserLogin().create(user)
-    #         rm = True if request.form.get('remainme') else False  # запоминание пользователя
-    #         login_user(userlogin, remember=rm)
-    #         return redirect(request.args.get('next') or url_for('profile'))
-    #
-    #     flash('Неверная пара логин/пароль', 'error')
-    #
-    # return render_template('login.html', menu=dbase.getMenu(), title='Авторизация')
+    return render_template("login.html", menu=dbase.getMenu(), title="Авторизация", form=form)
 
 
 @app.route("/register", methods=["POST", "GET"])
 def register():
     form = RegisterForm()
     if form.validate_on_submit():
-            hash = generate_password_hash(form.psw.data)
-            res = dbase.addUser(form.name.data, form.email.data, hash)
-            if res:
-                flash("Вы успешно зарегистрированы", "success")
-                return redirect(url_for('login'))
-            else:
-                flash("Ошибка при добавлении в БД", "error")
+        hash = generate_password_hash(form.psw.data)
+        res = dbase.addUser(form.name.data, form.email.data, hash)
+        if res:
+            flash("Вы успешно зарегистрированы", "success")
+            return redirect(url_for('login'))
+        else:
+            flash("Ошибка при добавлении в БД", "error")
 
     return render_template("register.html", menu=dbase.getMenu(), title="Регистрация", form=form)
 
@@ -144,14 +139,14 @@ def register():
 @login_required
 def logout():
     logout_user()
-    flash('Вы вышли из аккаунта', 'success')
+    flash("Вы вышли из аккаунта", "success")
     return redirect(url_for('login'))
 
 
 @app.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html', menu=dbase.getMenu(), title='Профиль')
+    return render_template("profile.html", menu=dbase.getMenu(), title="Профиль")
 
 
 @app.route('/userava')
@@ -166,7 +161,7 @@ def userava():
     return h
 
 
-@app.route("/upload", methods=['POST', 'GET'])
+@app.route('/upload', methods=["POST", "GET"])
 @login_required
 def upload():
     if request.method == 'POST':
@@ -176,15 +171,15 @@ def upload():
                 img = file.read()
                 res = dbase.updateUserAvatar(img, current_user.get_id())
                 if not res:
-                    flash("Ошибка обноваления аватара", "error")
-                flash("Аватар обновлен", 'success')
+                    flash("Ошибка обновления аватара", "error")
+                flash("Аватар обновлен", "success")
             except FileNotFoundError as e:
-                flash('Ошибка чтения файла', 'error')
+                flash("Ошибка чтения файла", "error")
         else:
-            flash('Ошибка обновления аватара', 'error')
+            flash("Ошибка обновления аватара", "error")
 
     return redirect(url_for('profile'))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
